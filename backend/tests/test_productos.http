@@ -1,0 +1,150 @@
+@baseUrl = http://127.0.0.1:8000
+
+### ==========================================
+### MÓDULO: PRODUCTOS (PostgreSQL)
+### Ejecutar en orden. Los datos persisten entre corridas: el nombre lleva un
+### timestamp para no chocar con el 409 por nombre duplicado, y los ids se
+### toman de la respuesta del alta (request variable).
+### ==========================================
+
+### 1. Crear Producto -> 201 Created
+# @name crearProducto
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Silla Ergonómica {{$timestamp}}",
+  "descripcion": "Silla con respaldo lumbar",
+  "categoria": "MUE-01",
+  "precio": 250.00,
+  "stock": 10,
+  "stock_minimo": 5,
+  "activo": true
+}
+
+### 2. Crear Producto con precio 0 (RN-03: precio >= 0) -> 201
+# @name crearProductoGratis
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Muestra gratis {{$timestamp}}",
+  "categoria": "MUE-01",
+  "precio": 0,
+  "stock": 1,
+  "stock_minimo": 0
+}
+
+### 3. Listar Productos con paginación -> 200
+GET {{baseUrl}}/productos/?skip=0&limit=5
+
+### 4. Detalle de Producto -> 200
+GET {{baseUrl}}/productos/{{crearProducto.response.body.id}}
+
+### 5. Actualizar Producto, reemplazo total -> 200
+# Bajamos el stock a 3 (< stock_minimo 5) para forzar la alerta del paso siguiente
+PUT {{baseUrl}}/productos/{{crearProducto.response.body.id}}
+Content-Type: application/json
+
+{
+  "nombre": "{{crearProducto.response.body.nombre}} Premium",
+  "descripcion": "Silla con respaldo lumbar y apoyabrazos",
+  "categoria": "MUE-01",
+  "precio": 299.99,
+  "stock": 3,
+  "stock_minimo": 5,
+  "activo": true
+}
+
+### 6. Consultar alerta de stock -> 200, "bajo_stock_minimo": true
+GET {{baseUrl}}/productos/{{crearProducto.response.body.id}}/stock
+
+### 7. Desactivar Producto (borrado lógico) -> 200, activo=false
+PUT {{baseUrl}}/productos/{{crearProducto.response.body.id}}/desactivar
+
+
+### ==========================================
+### ESCENARIOS DE ERROR
+### ==========================================
+
+### E1. Nombre duplicado (RN: mismo nombre, sin distinguir mayúsculas) -> 409
+# Usa el nombre del producto creado en el paso 1
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "  {{crearProducto.response.body.nombre}}  ",
+  "categoria": "MUE-01",
+  "precio": 10,
+  "stock": 1,
+  "stock_minimo": 0
+}
+
+### E2. Actualizar con el nombre de OTRO producto (el del paso 2) -> 409
+PUT {{baseUrl}}/productos/{{crearProducto.response.body.id}}
+Content-Type: application/json
+
+{
+  "nombre": "{{crearProductoGratis.response.body.nombre}}",
+  "categoria": "MUE-01",
+  "precio": 10,
+  "stock": 1,
+  "stock_minimo": 0
+}
+
+### E3. Nombre solo con espacios (RN-02) -> 422
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "     ",
+  "categoria": "MUE-01",
+  "precio": 10,
+  "stock": 1,
+  "stock_minimo": 0
+}
+
+### E4. Precio negativo (RN-03) -> 422
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Escritorio Roto",
+  "categoria": "MUE-01",
+  "precio": -50.00,
+  "stock": 5,
+  "stock_minimo": 5
+}
+
+### E5. Categoría con formato inválido -> 422
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Escritorio Roto",
+  "categoria": "MUEBLES",
+  "precio": 50.00,
+  "stock": 5,
+  "stock_minimo": 5
+}
+
+### E6. Detalle de id inexistente (RN-04) -> 404
+GET {{baseUrl}}/productos/99999
+
+### E7. Actualizar id inexistente (RN-04) -> 404
+PUT {{baseUrl}}/productos/99999
+Content-Type: application/json
+
+{
+  "nombre": "No existe",
+  "categoria": "MUE-01",
+  "precio": 10,
+  "stock": 1,
+  "stock_minimo": 0
+}
+
+### E8. Desactivar id inexistente (RN-04) -> 404
+PUT {{baseUrl}}/productos/99999/desactivar
+
+### E9. Stock de id inexistente (RN-04) -> 404
+GET {{baseUrl}}/productos/99999/stock

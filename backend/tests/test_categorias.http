@@ -1,0 +1,95 @@
+@baseUrl = http://127.0.0.1:8000
+
+### ==========================================
+### MÓDULO: CATEGORÍAS (PostgreSQL)
+### Ejecutar en orden. Los datos persisten entre corridas: el código se genera
+### al azar y los ids se toman de la respuesta del alta (request variable).
+### Si el alta da 409 por mala suerte con el número al azar, volver a enviarla.
+### ==========================================
+
+### 1. Listar Categorías -> 200 (al menos MUE-01 y ELE-02, cargadas al iniciar)
+GET {{baseUrl}}/categorias/
+
+### 2. Crear Categoría -> 201
+# @name crearCategoria
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "codigo": "HER-{{$randomInt 10 99}}",
+  "descripcion": "Herramientas Manuales",
+  "activo": true
+}
+
+### 3. Detalle de Categoría -> 200
+GET {{baseUrl}}/categorias/{{crearCategoria.response.body.id}}
+
+### 4. Actualizar Categoría, reemplazo total -> 200
+PUT {{baseUrl}}/categorias/{{crearCategoria.response.body.id}}
+Content-Type: application/json
+
+{
+  "codigo": "{{crearCategoria.response.body.codigo}}",
+  "descripcion": "Herramientas de Jardinería y Taller",
+  "activo": true
+}
+
+### 5. Desactivar Categoría (borrado lógico) -> 200, activo=false
+PUT {{baseUrl}}/categorias/{{crearCategoria.response.body.id}}/desactivar
+
+
+### ==========================================
+### ESCENARIOS DE ERROR
+### ==========================================
+
+### E1. Código duplicado -> 409 Conflict
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "codigo": "MUE-01",
+  "descripcion": "Otra categoría"
+}
+
+### E2. Actualizar con el código de OTRA categoría -> 409 Conflict
+PUT {{baseUrl}}/categorias/{{crearCategoria.response.body.id}}
+Content-Type: application/json
+
+{
+  "codigo": "MUE-01",
+  "descripcion": "Herramientas",
+  "activo": true
+}
+
+### E3. Código con formato inválido -> 422
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "codigo": "MUEBLES",
+  "descripcion": "Muebles"
+}
+
+### E4. Descripción con menos de 3 caracteres -> 422
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "codigo": "AAA-01",
+  "descripcion": "ab"
+}
+
+### E5. Detalle de id inexistente -> 404
+GET {{baseUrl}}/categorias/99999
+
+### E6. Actualizar id inexistente -> 404
+PUT {{baseUrl}}/categorias/99999
+Content-Type: application/json
+
+{
+  "codigo": "XYZ-99",
+  "descripcion": "No existe"
+}
+
+### E7. Desactivar id inexistente -> 404
+PUT {{baseUrl}}/categorias/99999/desactivar

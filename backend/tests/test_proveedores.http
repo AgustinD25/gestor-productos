@@ -1,0 +1,146 @@
+@baseUrl = http://127.0.0.1:8000
+
+### ==========================================
+### MÓDULO: PROVEEDORES (PostgreSQL)
+### Ejecutar en orden. Los datos persisten entre corridas: los códigos se
+### generan al azar y los ids se toman de la respuesta del alta (request
+### variable). Si un alta da 409 por mala suerte con el número al azar,
+### volver a enviarla.
+### ==========================================
+
+### 1. Crear Proveedor -> 201 Created
+# @name crearProveedor1
+POST {{baseUrl}}/proveedores/
+Content-Type: application/json
+
+{
+  "codigo": "PRO-{{$randomInt 10 99}}",
+  "razon_social": "Proveedor de Muebles S.A.",
+  "cuit": "30-12345678-9",
+  "email": "ventas@muebles.com",
+  "telefono": "351-1234567",
+  "activo": true
+}
+
+### 2. Crear segundo Proveedor (sin email/telefono: usan default "") -> 201
+# @name crearProveedor2
+POST {{baseUrl}}/proveedores/
+Content-Type: application/json
+
+{
+  "codigo": "ELE-{{$randomInt 10 99}}",
+  "razon_social": "Electrónica del Centro",
+  "cuit": "30-87654321-0"
+}
+
+### 3. Listar Proveedores -> 200
+GET {{baseUrl}}/proveedores/
+
+### 4. Listar con paginación -> 200, 1 elemento
+GET {{baseUrl}}/proveedores/?skip=1&limit=1
+
+### 5. Listar solo activos -> 200
+GET {{baseUrl}}/proveedores/?activo=true
+
+### 6. Detalle de Proveedor -> 200
+GET {{baseUrl}}/proveedores/{{crearProveedor1.response.body.id}}
+
+### 7. Actualizar Proveedor, reemplazo total -> 200
+PUT {{baseUrl}}/proveedores/{{crearProveedor1.response.body.id}}
+Content-Type: application/json
+
+{
+  "codigo": "{{crearProveedor1.response.body.codigo}}",
+  "razon_social": "Proveedor de Muebles y Oficina S.A.",
+  "cuit": "30-12345678-9",
+  "email": "contacto@muebles.com",
+  "telefono": "351-7654321",
+  "activo": true
+}
+
+### 8. Desactivar Proveedor (borrado lógico) -> 200, activo=false
+PUT {{baseUrl}}/proveedores/{{crearProveedor2.response.body.id}}/desactivar
+
+### 9. Listar solo inactivos -> 200, aparece el segundo proveedor
+GET {{baseUrl}}/proveedores/?activo=false
+
+
+### ==========================================
+### ESCENARIOS DE ERROR
+### ==========================================
+
+### E1. Código duplicado -> 409 Conflict
+POST {{baseUrl}}/proveedores/
+Content-Type: application/json
+
+{
+  "codigo": "{{crearProveedor1.response.body.codigo}}",
+  "razon_social": "Otro Proveedor S.R.L.",
+  "cuit": "30-11111111-1"
+}
+
+### E2. Actualizar con el código de OTRO proveedor -> 409 Conflict
+PUT {{baseUrl}}/proveedores/{{crearProveedor2.response.body.id}}
+Content-Type: application/json
+
+{
+  "codigo": "{{crearProveedor1.response.body.codigo}}",
+  "razon_social": "Electrónica del Centro",
+  "cuit": "30-87654321-0",
+  "activo": true
+}
+
+### E3. Código vacío -> 422
+POST {{baseUrl}}/proveedores/
+Content-Type: application/json
+
+{
+  "codigo": "",
+  "razon_social": "Proveedor Válido",
+  "cuit": "30-12345678-9"
+}
+
+### E4. Razón social con menos de 3 caracteres -> 422
+POST {{baseUrl}}/proveedores/
+Content-Type: application/json
+
+{
+  "codigo": "ABC-03",
+  "razon_social": "AB",
+  "cuit": "30-12345678-9"
+}
+
+### E5. CUIT inválido -> 422
+POST {{baseUrl}}/proveedores/
+Content-Type: application/json
+
+{
+  "codigo": "ABC-03",
+  "razon_social": "Proveedor Válido",
+  "cuit": "123"
+}
+
+### E6. Detalle de id inexistente -> 404
+GET {{baseUrl}}/proveedores/99999
+
+### E7. Actualizar id inexistente -> 404
+PUT {{baseUrl}}/proveedores/99999
+Content-Type: application/json
+
+{
+  "codigo": "XYZ-99",
+  "razon_social": "No Existe S.A.",
+  "cuit": "30-12345678-9"
+}
+
+### E8. Desactivar id inexistente -> 404
+PUT {{baseUrl}}/proveedores/99999/desactivar
+
+### E9. Desactivar proveedor ya desactivado (paso 8) -> 409
+PUT {{baseUrl}}/proveedores/{{crearProveedor2.response.body.id}}/desactivar
+
+### E10. Paginación inválida (limit=0) -> 422
+GET {{baseUrl}}/proveedores/?limit=0
+
+### E11. Paginación inválida (limit=51) -> 422
+GET {{baseUrl}}/proveedores/?limit=51
